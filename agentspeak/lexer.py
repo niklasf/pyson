@@ -23,11 +23,10 @@ import enum
 import re
 import sys
 
-import pyson
-import pyson.util
+import agentspeak
+import agentspeak.util
 
-from pyson import (SourceLocation, Trigger, GoalType, FormulaType,
-                   UnaryOp, BinaryOp)
+from agentspeak import (SourceLocation, Trigger, GoalType, FormulaType, UnaryOp, BinaryOp)
 
 
 class Token(object):
@@ -80,71 +79,74 @@ class TokenType(enum.Enum):
                 fullstop comma semicolon at
                 """
 
-    space         = Token(r"\s+", space=True)
-    comment       = Token(r"(//|#).*", comment=True)
+    space = Token(r"\s+", space=True)
+    comment = Token(r"(//|#).*", comment=True)
 
-    paren_open    = Token(r"\(")
-    paren_close   = Token(r"\)")
+    paren_open = Token(r"\(")
+    paren_close = Token(r"\)")
 
-    bracket_open  = Token(r"\[")
+    bracket_open = Token(r"\[")
     bracket_close = Token(r"\]")
 
-    brace_open    = Token(r"{")
-    brace_close   = Token(r"}")
+    brace_open = Token(r"{")
+    brace_close = Token(r"}")
 
-    functor       = Token(r"(~?(?!(true|false|not|div|mod|if|else|while|for|include|begin|end)($|[^a-zA-Z0-9_]))((\.?[a-z][a-zA-Z0-9_]*)+))", functor=True)
-    numeric       = Token(r"((\d*\.\d+|\d+)([eE][+-]?\d+)?)", numeric=True)
-    variable      = Token(r"(_*[A-Z][a-zA-Z0-9_]*|_+)", variable=True)
-    string        = Token(r"\"([^\\\"]|\\.)*\"", string=True)
+    functor = Token(r"(~?(?!(true|false|not|div|mod|if|else|while|for|include|begin|end)($|[^a-zA-Z0-9_]))((\.?[a-z][a-zA-Z0-9_]*)+))",
+                    functor=True)
+    numeric = Token(r"((\d*\.\d+|\d+)([eE][+-]?\d+)?)", numeric=True)
+    variable = Token(r"(_*[A-Z][a-zA-Z0-9_]*|_+)", variable=True)
+    string = Token(r"\"([^\\\"]|\\.)*\"", string=True)
 
-    lit_true      = Token(r"true", boolean=True)
-    lit_false     = Token(r"false", boolean=False)
+    lit_true = Token(r"true", boolean=True)
+    lit_false = Token(r"false", boolean=False)
 
-    tok_if        = Token(r"if")
-    tok_else      = Token(r"else")
-    tok_while     = Token(r"while")
-    tok_for       = Token(r"for")
+    tok_if = Token(r"if")
+    tok_else = Token(r"else")
+    tok_while = Token(r"while")
+    tok_for = Token(r"for")
 
-    include       = Token(r"include")
-    begin         = Token(r"begin")
-    end           = Token(r"end")
+    include = Token(r"include")
+    begin = Token(r"begin")
+    end = Token(r"end")
 
-    arrow         = Token(r"<-")
-    define        = Token(r":-")
-    colon         = Token(r":")
+    arrow = Token(r"<-")
+    define = Token(r":-")
+    colon = Token(r":")
 
     fork_join_and = Token(r"\|&\|")
     fork_join_xor = Token(r"\|\|\|")
 
     double_exclam = Token(r"!!", formula_type=FormulaType.achieve_later)
-    exclam        = Token(r"!", formula_type=FormulaType.achieve, goal_type=GoalType.achievement)
-    question      = Token(r"\?", formula_type=FormulaType.test, goal_type=GoalType.test)
-    minus_plus    = Token(r"-\+", formula_type=FormulaType.replace)
+    exclam = Token(r"!", formula_type=FormulaType.achieve, goal_type=GoalType.achievement)
+    question = Token(r"\?", formula_type=FormulaType.test, goal_type=GoalType.test)
+    minus_plus = Token(r"-\+", formula_type=FormulaType.replace)
 
-    op_not        = Token(r"not")
-    op_plus       = Token(r"\+", unary_op=UnaryOp.op_pos, add_op=BinaryOp.op_add, trigger=Trigger.addition, formula_type=FormulaType.add)
-    op_minus      = Token(r"-", unary_op=UnaryOp.op_neg, add_op=BinaryOp.op_sub, trigger=Trigger.removal, formula_type=FormulaType.remove)
-    op_power      = Token(r"\*\*")
-    op_mult       = Token(r"\*", mult_op=BinaryOp.op_mul)
-    op_fdiv       = Token(r"/", mult_op=BinaryOp.op_truediv)
-    op_div        = Token(r"div", mult_op=BinaryOp.op_floordiv)
-    op_mod        = Token(r"mod", mult_op=BinaryOp.op_mod)
-    op_and        = Token(r"&")
-    op_or         = Token(r"\|")
+    op_not = Token(r"not")
+    op_plus = Token(r"\+", unary_op=UnaryOp.op_pos, add_op=BinaryOp.op_add, trigger=Trigger.addition,
+                    formula_type=FormulaType.add)
+    op_minus = Token(r"-", unary_op=UnaryOp.op_neg, add_op=BinaryOp.op_sub, trigger=Trigger.removal,
+                     formula_type=FormulaType.remove)
+    op_power = Token(r"\*\*")
+    op_mult = Token(r"\*", mult_op=BinaryOp.op_mul)
+    op_fdiv = Token(r"/", mult_op=BinaryOp.op_truediv)
+    op_div = Token(r"div", mult_op=BinaryOp.op_floordiv)
+    op_mod = Token(r"mod", mult_op=BinaryOp.op_mod)
+    op_and = Token(r"&")
+    op_or = Token(r"\|")
 
-    op_le         = Token(r"<=", comp_op=BinaryOp.op_le)
-    op_ge         = Token(r">=", comp_op=BinaryOp.op_ge)
-    op_ne         = Token(r"\\==", comp_op=BinaryOp.op_ne)
-    op_eq         = Token(r"==", comp_op=BinaryOp.op_eq)
-    op_decompose  = Token(r"=\.\.", comp_op=BinaryOp.op_decompose)
-    op_unify      = Token(r"=", comp_op=BinaryOp.op_unify)
-    op_lt         = Token(r"<", comp_op=BinaryOp.op_lt)
-    op_gt         = Token(r">", comp_op=BinaryOp.op_gt)
+    op_le = Token(r"<=", comp_op=BinaryOp.op_le)
+    op_ge = Token(r">=", comp_op=BinaryOp.op_ge)
+    op_ne = Token(r"\\==", comp_op=BinaryOp.op_ne)
+    op_eq = Token(r"==", comp_op=BinaryOp.op_eq)
+    op_decompose = Token(r"=\.\.", comp_op=BinaryOp.op_decompose)
+    op_unify = Token(r"=", comp_op=BinaryOp.op_unify)
+    op_lt = Token(r"<", comp_op=BinaryOp.op_lt)
+    op_gt = Token(r">", comp_op=BinaryOp.op_gt)
 
-    fullstop      = Token(r"\.")
-    comma         = Token(r",")
-    semicolon     = Token(r";")
-    at            = Token(r"@")
+    fullstop = Token(r"\.")
+    comma = Token(r",")
+    semicolon = Token(r";")
+    at = Token(r"@")
 
 
 RE_START_COMMENT = re.compile(r"/\*")
@@ -191,7 +193,8 @@ def tokenize(sourcefile, log, firstline=1):
                 startcol = match.end(0)
                 break
             else:
-                log.error("illegal character '%s'", line[startcol], loc=SourceLocation(sourcefile.name, lineno + firstline, startcol, startcol, line))
+                log.error("illegal character '%s'", line[startcol],
+                          loc=SourceLocation(sourcefile.name, lineno + firstline, startcol, startcol, line))
                 startcol += 1
 
 
@@ -211,7 +214,7 @@ class TokenStream(object):
 
 
 def main(source, lineno=1):
-    log = pyson.Log(pyson.get_logger(__name__), 3)
+    log = agentspeak.Log(agentspeak.get_logger(__name__), 3)
 
     for tok in tokenize(source, log, lineno):
         log.info("%s", tok.lexeme, loc=tok.loc)
@@ -223,10 +226,10 @@ def repl():
     lineno = 1
     while True:
         try:
-            line = pyson.util.prompt("pyson.lexer >>> ")
-            main(pyson.StringSource("<stdin>", line), lineno)
+            line = agentspeak.util.prompt("agentspeak.lexer >>> ")
+            main(agentspeak.StringSource("<stdin>", line), lineno)
             lineno += 1
-        except pyson.AggregatedError as error:
+        except agentspeak.AggregatedError as error:
             print(str(error), file=sys.stderr)
         except KeyboardInterrupt:
             print()
@@ -244,6 +247,6 @@ if __name__ == "__main__":
             repl()
         else:
             main(sys.stdin)
-    except pyson.AggregatedError as error:
+    except agentspeak.AggregatedError as error:
         print(str(error), file=sys.stderr)
         sys.exit(1)

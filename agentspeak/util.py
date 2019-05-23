@@ -16,5 +16,27 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import pyson.runtime
-pyson.runtime.main(post_repl=False)
+from __future__ import print_function
+
+import colorama
+
+try:
+    input = raw_input  # Python 2
+except NameError:
+    pass  # Python 3
+
+
+def indent(s, spaces=2):
+    return "\n".join((" " * spaces + line) for line in s.splitlines())
+
+
+def prompt(text):
+    prefix = colorama.Fore.CYAN + text + colorama.Fore.RESET
+
+    with colorama.colorama_text():
+        try:
+            import readline
+            return input(prefix)
+        except ImportError:
+            print(prefix, end="")
+            return input()

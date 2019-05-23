@@ -2,9 +2,9 @@
 
 from __future__ import print_function
 
-import pyson
-import pyson.runtime
-import pyson.stdlib
+import agentspeak
+import agentspeak.runtime
+import agentspeak.stdlib
 import math
 import random
 import sys
@@ -15,9 +15,10 @@ import os.path
 
 files = set()
 
-actions = pyson.Actions(pyson.stdlib.actions)
+actions = agentspeak.Actions(agentspeak.stdlib.actions)
 
 actions.add_function(".sin", float, math.sin)
+
 
 @actions.add_function(".f", float)
 def f(val):
@@ -49,15 +50,15 @@ def delete_file():
 
 # Agents
 
-env = pyson.runtime.Environment()
+env = agentspeak.runtime.Environment()
 
 os.chdir(os.path.dirname(__file__))
 
 with open("developer.asl") as source:
-    agents = pyson.runtime.build_agents(source, 4, actions)
+    agents = agentspeak.runtime.build_agents(source, 4, actions)
 
 with open("maintainer.asl") as source:
-    maintainer = pyson.runtime.build_agent(source, actions)
+    maintainer = agentspeak.runtime.build_agent(source, actions)
     agents.append(maintainer)
 
 
@@ -81,12 +82,12 @@ if plot:
     plt.axis([0, 5 * 365, 0, 600])
 
 for day in range(5 * 365):
-    term = pyson.Literal("day", (day, ))
+    term = agentspeak.Literal("day", (day,))
     print(term)
 
     for agent in agents:
-        agent.call(pyson.Trigger.addition,
-                   pyson.GoalType.achievement,
+        agent.call(agentspeak.Trigger.addition,
+                   agentspeak.GoalType.achievement,
                    env, term, {}, delayed=True)
 
     run()
@@ -95,16 +96,15 @@ for day in range(5 * 365):
 
     if plot:
         import matplotlib.pyplot as plt
+
         plt.scatter(day, len(files))
         plt.show()
         plt.pause(0.001)
 
     print(day, len(files), sep=",", file=result_file)
 
-
 result_file.close()
-
 
 # Debug
 
-pyson.runtime.repl(maintainer, actions)
+agentspeak.runtime.repl(maintainer, actions)

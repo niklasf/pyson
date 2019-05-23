@@ -1,59 +1,54 @@
 #!/usr/bin/env python
 
-import unittest
-import pyson
+import agentspeak
 
 
-class TermTest(unittest.TestCase):
+def test_unifies():
+    assert not agentspeak.unifies(True, 1)
 
-    def test_unifies(self):
-        self.assertFalse(pyson.unifies(True, 1))
+    assert agentspeak.unifies(3, 3.0)
+    assert agentspeak.unifies(True, True)
+    assert agentspeak.unifies(5, agentspeak.Wildcard())
+    assert agentspeak.unifies((1, 2), (1, agentspeak.Wildcard()))
+    assert agentspeak.unifies(("hello", 2), ("hello", agentspeak.Var()))
 
-        self.assertTrue(pyson.unifies(3, 3.0))
-        self.assertTrue(pyson.unifies(True, True))
-        self.assertTrue(pyson.unifies(5, pyson.Wildcard()))
-        self.assertTrue(pyson.unifies((1, 2), (1, pyson.Wildcard())))
-        self.assertTrue(pyson.unifies(("hello", 2), ("hello", pyson.Var())))
+    assert agentspeak.unifies(agentspeak.Var(), agentspeak.Literal("beep"))
+    assert agentspeak.unifies(agentspeak.Literal("boop"), agentspeak.Var())
 
-        self.assertTrue(pyson.unifies(pyson.Var(), pyson.Literal("beep")))
-        self.assertTrue(pyson.unifies(pyson.Literal("boop"), pyson.Var()))
-
-        X = pyson.Var()
-        self.assertTrue(pyson.unifies(pyson.Literal("foo", (X, X)), pyson.Literal("foo", (1, 1))))
-        self.assertFalse(pyson.unifies(pyson.Literal("bar", (X, X)), pyson.Literal("bar", (1, 2))))
-
-    def test_unifies_annotated(self):
-        X = pyson.Var()
-        Y = pyson.Var()
-        foo_a = pyson.Literal("foo", (), ("a", ))
-        foo_ab = pyson.Literal("foo", (), ("a", "b"))
-        foo_XY = pyson.Literal("foo", (), (X, Y))
-        foo_XX = pyson.Literal("foo", (), (X, X))
-
-        self.assertTrue(pyson.unifies_annotated(foo_a, foo_ab))
-        self.assertTrue(pyson.unifies_annotated(foo_a, foo_XY))
-        self.assertTrue(pyson.unifies_annotated(foo_a, foo_XX))
-        self.assertTrue(pyson.unifies_annotated(foo_ab, foo_XY))
-        self.assertTrue(pyson.unifies_annotated(foo_XY, foo_ab))
-        self.assertTrue(pyson.unifies_annotated(foo_XX, foo_ab))
-        self.assertTrue(pyson.unifies_annotated(foo_XX, foo_ab))
-
-        self.assertFalse(pyson.unifies_annotated(foo_ab, foo_XX))
-        self.assertFalse(pyson.unifies_annotated(foo_XY, foo_a))
-
-    def test_parse_string(self):
-        self.assertEqual(pyson.parse_string('"hello"'), "hello")
-        self.assertEqual(pyson.parse_string('"line 1\nline 2"'), "line 1\nline 2")
-
-    def test_is_number(self):
-        self.assertTrue(pyson.is_number(1))
-        self.assertTrue(pyson.is_number(-3.7))
-        self.assertTrue(pyson.is_number(2 ** 128))
-
-        self.assertFalse(pyson.is_number("a string"))
-        self.assertFalse(pyson.is_number(False))
-        self.assertFalse(pyson.is_number(True))
+    X = agentspeak.Var()
+    assert agentspeak.unifies(agentspeak.Literal("foo", (X, X)), agentspeak.Literal("foo", (1, 1)))
+    assert not agentspeak.unifies(agentspeak.Literal("bar", (X, X)), agentspeak.Literal("bar", (1, 2)))
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_unifies_annotated():
+    X = agentspeak.Var()
+    Y = agentspeak.Var()
+    foo_a = agentspeak.Literal("foo", (), ("a",))
+    foo_ab = agentspeak.Literal("foo", (), ("a", "b"))
+    foo_XY = agentspeak.Literal("foo", (), (X, Y))
+    foo_XX = agentspeak.Literal("foo", (), (X, X))
+
+    assert agentspeak.unifies_annotated(foo_a, foo_ab)
+    assert agentspeak.unifies_annotated(foo_a, foo_XY)
+    assert agentspeak.unifies_annotated(foo_a, foo_XX)
+    assert agentspeak.unifies_annotated(foo_ab, foo_XY)
+    assert agentspeak.unifies_annotated(foo_XY, foo_ab)
+    assert agentspeak.unifies_annotated(foo_XX, foo_ab)
+    assert agentspeak.unifies_annotated(foo_XX, foo_ab)
+
+    assert not agentspeak.unifies_annotated(foo_ab, foo_XX)
+
+
+def test_parse_string():
+    assert agentspeak.parse_string('"hello"') == "hello"
+    assert agentspeak.parse_string('"line 1\nline 2"') == "line 1\nline 2"
+
+
+def test_is_number():
+    assert agentspeak.is_number(1)
+    assert agentspeak.is_number(-3.7)
+    assert agentspeak.is_number(2 ** 128)
+
+    assert not agentspeak.is_number("a string")
+    assert not agentspeak.is_number(False)
+    assert not agentspeak.is_number(True)

@@ -1,25 +1,21 @@
 import asyncio
-import logging
 
 from lxml import etree
 
 from heapq import heapify, heappop
 
-import pyson
-import pyson.runtime
-import pyson.ext_stdlib
+import agentspeak
+import agentspeak.runtime
+import agentspeak.ext_stdlib
+
+LOGGER = agentspeak.get_logger(__name__)
+
+actions = agentspeak.Actions(agentspeak.ext_stdlib.actions)
+
+PERCEPT_TAG = frozenset([agentspeak.Literal("source", (agentspeak.Literal("percept"),))])
 
 
-LOGGER = pyson.get_logger(__name__)
-
-
-actions = pyson.Actions(pyson.ext_stdlib.actions)
-
-
-PERCEPT_TAG = frozenset([pyson.Literal("source", (pyson.Literal("percept"), ))])
-
-
-class Environment(pyson.runtime.Environment):
+class Environment(agentspeak.runtime.Environment):
     def time(self):
         return asyncio.get_event_loop().time()
 
@@ -40,7 +36,7 @@ class Environment(pyson.runtime.Environment):
             loop.call_at(earliest, self.run)
 
 
-class Agent(pyson.runtime.Agent, asyncio.Protocol):
+class Agent(agentspeak.runtime.Agent, asyncio.Protocol):
     def __init__(self, env, name):
         super(Agent, self).__init__(env, name)
         self.action_id = None
@@ -99,7 +95,7 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
         message = etree.Element("message")
         action = etree.SubElement(message, "action", type=term.functor.lstrip("."), id=str(self.action_id))
         for param in term.args:
-            p = pyson.grounded(param, intention.scope)
+            p = agentspeak.grounded(param, intention.scope)
             if isinstance(p, float) and p.is_integer():
                 p = int(p)
             etree.SubElement(action, "p").text = str(p)
@@ -127,10 +123,10 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
         LOGGER.warning("socket connection lost (reason: %s)", exc)
 
         self.call(
-            pyson.Trigger.removal,
-            pyson.GoalType.belief,
-            pyson.Literal("connected", (self.name, )),
-            pyson.runtime.Intention())
+            agentspeak.Trigger.removal,
+            agentspeak.GoalType.belief,
+            agentspeak.Literal("connected", (self.name,)),
+            agentspeak.runtime.Intention())
 
         self.env.run()
 
@@ -154,7 +150,8 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
             LOGGER.error("unknown message type: %r", message.get("type"))
 
         # Delay run until all agents are in a consistent state.
-        if all(agent.simulation_step is None or agent.simulation_step == self.simulation_step for agent in self.env.agents.values()):
+        if all(agent.simulation_step is None or agent.simulation_step == self.simulation_step for agent in
+               self.env.agents.values()):
             if self.simulation_step is not None:
                 LOGGER.debug("%s was the last agent to receive step %d", self.name, self.simulation_step)
             self.env.run()
@@ -162,20 +159,20 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
             LOGGER.debug("%s will wait for other agents to be in step %d", self.name, self.simulation_step)
 
     def _set_belief(self, name, *args):
-        term = pyson.Literal(name, tuple(args), PERCEPT_TAG)
+        term = agentspeak.Literal(name, tuple(args), PERCEPT_TAG)
 
         found = False
 
         for belief in list(self.beliefs[term.literal_group()]):
-            if pyson.unifies(term, belief):
+            if agentspeak.unifies(term, belief):
                 found = True
             else:
-                self.call(pyson.Trigger.removal, pyson.GoalType.belief, belief,
-                          pyson.runtime.Intention())
+                self.call(agentspeak.Trigger.removal, agentspeak.GoalType.belief, belief,
+                          agentspeak.runtime.Intention())
 
         if not found:
-            self.call(pyson.Trigger.addition, pyson.GoalType.belief, term,
-                      pyson.runtime.Intention())
+            self.call(agentspeak.Trigger.addition, agentspeak.GoalType.belief, term,
+                      agentspeak.runtime.Intention())
 
     def _replace_beliefs(self, group, beliefs):
         old_beliefs = list(self.beliefs[group])
@@ -189,21 +186,21 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
                 heappop(old_beliefs)
                 heappop(new_beliefs)
             elif old_belief < new_belief:
-                self.call(pyson.Trigger.removal, pyson.GoalType.belief, old_belief,
-                          pyson.runtime.Intention())
+                self.call(agentspeak.Trigger.removal, agentspeak.GoalType.belief, old_belief,
+                          agentspeak.runtime.Intention())
                 heappop(old_beliefs)
             elif old_belief > new_belief:
-                self.call(pyson.Trigger.addition, pyson.GoalType.belief, new_belief,
-                          pyson.runtime.Intention())
+                self.call(agentspeak.Trigger.addition, agentspeak.GoalType.belief, new_belief,
+                          agentspeak.runtime.Intention())
                 heappop(new_beliefs)
 
         while len(old_beliefs) > 0:
-            self.call(pyson.Trigger.removal, pyson.GoalType.belief, old_beliefs[0],
-                      pyson.runtime.Intention())
+            self.call(agentspeak.Trigger.removal, agentspeak.GoalType.belief, old_beliefs[0],
+                      agentspeak.runtime.Intention())
             heappop(old_beliefs)
         while len(new_beliefs) > 0:
-            self.call(pyson.Trigger.addition, pyson.GoalType.belief, new_beliefs[0],
-                      pyson.runtime.Intention())
+            self.call(agentspeak.Trigger.addition, agentspeak.GoalType.belief, new_beliefs[0],
+                      agentspeak.runtime.Intention())
             heappop(new_beliefs)
 
     def handle_auth_response(self, response):
@@ -211,7 +208,6 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
             LOGGER.error("auth response for %s: %r", self.name, response.get("result"))
         else:
             self._set_belief("connected", self.name)
-
 
     def handle_sim_start(self, simulation):
         self._set_belief("id", simulation.get("id"))
@@ -222,23 +218,22 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
 
         role = simulation.find("role")
         self._set_belief("role",
-            pyson.Literal(role.get("name").lower()),
-            int(role.get("speed")),
-            int(role.get("load")),
-            int(role.get("battery")),
-            tuple(tool.get("name") for tool in role.findall("./tool")))
+                         agentspeak.Literal(role.get("name").lower()),
+                         int(role.get("speed")),
+                         int(role.get("load")),
+                         int(role.get("battery")),
+                         tuple(tool.get("name") for tool in role.findall("./tool")))
 
         # Update item beliefs.
         item_beliefs = []
 
         for item in simulation.findall("./item"):
             tools = tuple(tool.get("name") for tool in item.findall("./tool"))
-            parts = tuple(pyson.Literal("parts", (part.get("name"), int(part.get("amount")))) for part in item.findall("./item"))
+            parts = tuple(agentspeak.Literal("parts", (part.get("name"), int(part.get("amount")))) for part in
+                          item.findall("./item"))
 
-            item_beliefs.append(
-                pyson.Literal("item", (
-                    item.get("name"), int(item.get("volume")), tools, parts),
-                    PERCEPT_TAG))
+            item_beliefs.append(agentspeak.Literal("item", (item.get("name"), int(item.get("volume")), tools, parts),
+                                                   PERCEPT_TAG))
 
         self._replace_beliefs(("item", 4), item_beliefs)
 
@@ -263,7 +258,7 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
         route = []
         for wp in self_data.findall("./route"):
             route.append(
-                pyson.Literal("wp", (
+                agentspeak.Literal("wp", (
                     int(wp.get("i")), float(wp.get("lat")), float(wp.get("lon")),
                     PERCEPT_TAG)))
         self._set_belief("route", tuple(route))
@@ -272,8 +267,8 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
 
         action = self_data.find("action")
         if action is not None:
-            self._set_belief("lastAction", pyson.Literal(action.get("type")))
-            self._set_belief("lastActionResult", pyson.Literal(action.get("result")))
+            self._set_belief("lastAction", agentspeak.Literal(action.get("type")))
+            self._set_belief("lastActionResult", agentspeak.Literal(action.get("result")))
             # TODO: Action parameters
         else:
             self._replace_beliefs(("lastAction", 1), [])
@@ -282,27 +277,24 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
         # Update carried items.
         carried_items = []
         for item in self_data.findall("./items"):
-            carried_items.append(
-                pyson.Literal("item", (
-                    item.get("name"), int(item.get("amount"))),
-                    PERCEPT_TAG))
+            carried_items.append(agentspeak.Literal("item", (item.get("name"), int(item.get("amount"))), PERCEPT_TAG))
         self._replace_beliefs(("item", 2), carried_items)
 
         # Update entities.
         entities = []
         for entity in req.findall("entity"):
             entities.append(
-                pyson.Literal("entity", (
-                    pyson.Literal(entity.get("name")), entity.get("team"),
+                agentspeak.Literal("entity", (
+                    agentspeak.Literal(entity.get("name")), entity.get("team"),
                     float(entity.get("lat")), float(entity.get("lon")),
-                    pyson.Literal(entity.get("role").lower())), PERCEPT_TAG))
+                    agentspeak.Literal(entity.get("role").lower())), PERCEPT_TAG))
         self._replace_beliefs(("entity", 5), entities)
 
         # Update charging station pecepts
         charging_stations = []
         for station in req.findall("chargingStation"):
             charging_stations.append(
-                pyson.Literal("chargingStation", (
+                agentspeak.Literal("chargingStation", (
                     station.get("name"), float(station.get("lat")), float(station.get("lon")),
                     int(station.get("rate"))), PERCEPT_TAG))
         self._replace_beliefs(("chargingStation", 4), charging_stations)
@@ -310,10 +302,8 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
         # Update dumps.
         dumps = []
         for dump in req.findall("dump"):
-            dumps.append(
-                pyson.Literal("dump", (
-                    dump.get("name"), float(dump.get("lat")), float(dump.get("lon"))),
-                    PERCEPT_TAG))
+            dumps.append(agentspeak.Literal("dump", (dump.get("name"), float(dump.get("lat")), float(dump.get("lon"))),
+                                            PERCEPT_TAG))
         self._replace_beliefs(("dump", 4), dumps)
 
         # Update shops.
@@ -322,12 +312,12 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
             shop_items = []
             for item in shop.findall("item"):
                 shop_items.append(
-                    pyson.Literal("item", (
+                    agentspeak.Literal("item", (
                         item.get("name"),
                         int(item.get("price")),
                         int(item.get("amount")))))
             shops.append(
-                pyson.Literal("shop", (
+                agentspeak.Literal("shop", (
                     shop.get("name"), float(shop.get("lat")), float(shop.get("lon")),
                     int(shop.get("restock")), tuple(shop_items)), PERCEPT_TAG))
         self._replace_beliefs(("shop", 5), shops)
@@ -338,12 +328,12 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
             storage_items = []
             for item in storage.findall("item"):
                 storage_items.append(
-                    pyson.Literal("item", (
+                    agentspeak.Literal("item", (
                         item.get("name"),
                         int(item.get("stored")),
                         int(item.get("delivered")))))
             storages.append(
-                pyson.Literal("storage", (
+                agentspeak.Literal("storage", (
                     storage.get("name"), float(storage.get("lat")), float(storage.get("lon")),
                     int(storage.get("totalCapacity")), int(storage.get("usedCapacity")),
                     tuple(storage_items)), PERCEPT_TAG))
@@ -352,19 +342,20 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
         # Update workshops.
         workshops = []
         for workshop in req.findall("workshop"):
-            workshops.append(
-                pyson.Literal("workshop", (
-                    workshop.get("name"), float(workshop.get("lat")), float(workshop.get("lon"))),
-                    PERCEPT_TAG))
+            workshops.append(agentspeak.Literal("workshop", (workshop.get("name"),
+                                                             float(workshop.get("lat")),
+                                                             float(workshop.get("lon"))),
+                                                PERCEPT_TAG))
         self._replace_beliefs(("workshop", 3), workshops)
 
         # Update resource nodes.
         resource_nodes = []
         for node in req.findall("resourceNode"):
-            resource_nodes.append(
-                pyson.Literal("resourceNode", (
-                    node.get("name"), float(node.get("lat")), float(node.get("lon")), node.get("resource")),
-                    PERCEPT_TAG))
+            resource_nodes.append(agentspeak.Literal("resourceNode", (node.get("name"),
+                                                                      float(node.get("lat")),
+                                                                      float(node.get("lon")),
+                                                                      node.get("resource")),
+                                                     PERCEPT_TAG))
         self._replace_beliefs(("resourceNode", 4), resource_nodes)
 
         # Update job percepts.
@@ -373,53 +364,55 @@ class Agent(pyson.runtime.Agent, asyncio.Protocol):
         missions = []
         posteds = []
         for job in req.findall("job"):
-            required = tuple(pyson.Literal("required", (item.get("name"), int(item.get("amount"))))
+            required = tuple(agentspeak.Literal("required", (item.get("name"), int(item.get("amount"))))
                              for item in job.findall("required"))
 
             jobs.append(
-                pyson.Literal("job", (
-                    job.get("id"), job.get("storage"), int(job.get("reward")),
-                    int(job.get("start")),int(job.get("end")), required),
-                    PERCEPT_TAG))
+                agentspeak.Literal("job", (job.get("id"), job.get("storage"),
+                                           int(job.get("reward")),
+                                           int(job.get("start")),
+                                           int(job.get("end")), required),
+                                   PERCEPT_TAG))
 
         for auction in req.findall("auction"):
-            required = tuple(pyson.Literal("required", (item.get("name"), int(item.get("amount"))))
+            required = tuple(agentspeak.Literal("required", (item.get("name"), int(item.get("amount"))))
                              for item in auction.findall("required"))
 
             reward = int(auction.get("reward"))
-            auctions.append(
-                pyson.Literal("auction", (
-                    auction.get("id"), auction.get("storage"), reward,
-                    int(auction.get("start")),int(auction.get("end")), int(auction.get("fine")),
-                    int(auction.get("lowestBid", str(reward + 1))), int(auction.get("auctionTime")), required),
-                    PERCEPT_TAG))
+            auctions.append(agentspeak.Literal("auction", (auction.get("id"), auction.get("storage"), reward,
+                                                           int(auction.get("start")),
+                                                           int(auction.get("end")),
+                                                           int(auction.get("fine")),
+                                                           int(auction.get("lowestBid", str(reward + 1))),
+                                                           int(auction.get("auctionTime")), required),
+                                               PERCEPT_TAG))
 
         for mission in req.findall("mission"):
-            required = tuple(pyson.Literal("required", (item.get("name"), int(item.get("amount"))))
+            required = tuple(agentspeak.Literal("required", (item.get("name"), int(item.get("amount"))))
                              for item in mission.findall("required"))
 
-            missions.append(
-                pyson.Literal("mission", (
-                    mission.get("id"), mission.get("storage"), int(mission.get("reward")),
-                    int(mission.get("start")), int(mission.get("end")), int(mission.get("fine")),
-                    int(mission.get("lowestBid")), 0, required),
-                    PERCEPT_TAG))
+            missions.append(agentspeak.Literal("mission", (mission.get("id"), mission.get("storage"),
+                                                           int(mission.get("reward")),
+                                                           int(mission.get("start")),
+                                                           int(mission.get("end")),
+                                                           int(mission.get("fine")),
+                                                           int(mission.get("lowestBid")), 0, required),
+                                               PERCEPT_TAG))
 
         for posted in req.findall("posted"):
-            required = tuple(pyson.Literal("required", (item.get("name"), int(item.get("amount"))))
+            required = tuple(agentspeak.Literal("required", (item.get("name"), int(item.get("amount"))))
                              for item in posted.findall("required"))
 
-            posteds.append(
-                pyson.Literal("job", (
-                    posted.get("id"), posted.get("storage"), int(posted.get("reward")),
-                    int(posted.get("start")),int(posted.get("end")), required),
-                    PERCEPT_TAG))
+            posteds.append(agentspeak.Literal("job", (posted.get("id"), posted.get("storage"),
+                                                      int(posted.get("reward")),
+                                                      int(posted.get("start")),
+                                                      int(posted.get("end")), required),
+                                              PERCEPT_TAG))
 
         self._replace_beliefs(("job", 5), jobs)
         self._replace_beliefs(("auction", 9), auctions)
         self._replace_beliefs(("mission", 9), missions)
         self._replace_beliefs(("posted", 5), posteds)
-
 
         # Update step.
         self._set_belief("timestamp", int(message.get("timestamp")))

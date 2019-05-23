@@ -5,12 +5,11 @@ import collections
 import itertools
 import numpy.random
 
-import pyson
-import pyson.stdlib
-import pyson.runtime
+import agentspeak
+import agentspeak.stdlib
+import agentspeak.runtime
 
 from helper import Schedule, Graph, iter_choice
-
 
 # #############################################################################
 # Parameters
@@ -42,12 +41,11 @@ CATEGORY_PROBABILITY = 0.35
 LAST_STAGE = 0.85
 START_TICK_LAST_STAGE = int(SIM_ROUNDS * LAST_STAGE)
 
-
 # #############################################################################
 # Actions
 # #############################################################################
 
-actions = pyson.Actions(pyson.stdlib.actions)
+actions = agentspeak.Actions(agentspeak.stdlib.actions)
 actions.add_function(".randint", (int, int), random.randint)
 
 
@@ -158,13 +156,12 @@ class Developer:
         return any(module.creator == self.name for module in bugs.outgoing[bug])
 
 
-class Creator(Developer, pyson.runtime.Agent):
-
-    actions = pyson.Actions(actions)
+class Creator(Developer, agentspeak.runtime.Agent):
+    actions = agentspeak.Actions(actions)
 
     def __init__(self, env, name, beliefs=None, rules=None, plans=None):
         Developer.__init__(self, name)
-        pyson.runtime.Agent.__init__(self, env, name, beliefs, rules, plans)
+        agentspeak.runtime.Agent.__init__(self, env, name, beliefs, rules, plans)
         self.days = 6
 
     @actions.add(".do_work")
@@ -209,6 +206,7 @@ class Creator(Developer, pyson.runtime.Agent):
             bug.closed = schedule.tick
         elif self.is_owner(bug) and p_fix <= 0.95:
             bug.closed = schedule.tick
+
 
 class Maintainer(Developer):
 
@@ -256,6 +254,7 @@ class Maintainer(Developer):
         elif self.is_owner(bug) and p_fix <= 0.90:
             bug.closed = schedule.tick
 
+
 class MajorDeveloper(Developer):
 
     def __init__(self, name):
@@ -300,6 +299,7 @@ class MajorDeveloper(Developer):
             bug.closed = schedule.tick
         elif self.is_owner(bug) and p_fix <= 0.25:
             bug.closed = schedule.tick
+
 
 class MinorDeveloper(Developer):
 
@@ -351,7 +351,7 @@ class MinorDeveloper(Developer):
 # Initialization
 # #############################################################################
 
-env = pyson.runtime.Environment()
+env = agentspeak.runtime.Environment()
 schedule = Schedule()
 coupling = Graph()
 bugs = Graph()
@@ -406,20 +406,22 @@ def create_bug():
         else:
             bugs.incr_edge(Bug("normal", schedule.tick), module)
 
+
 @schedule.add(interval=365)
 def debug():
     print("Bugs:", sum(1 for bug in bugs.outgoing if not bug.closed))
+
 
 @schedule.add(interval=1)
 def do_some_work():
     for developer in developers:
         if developer.active:
-            if isinstance(developer, pyson.runtime.Agent):
+            if isinstance(developer, agentspeak.runtime.Agent):
                 developer.call(
-                    pyson.Trigger.addition,
-                    pyson.GoalType.achievement,
-                    pyson.Literal("tick"),
-                    pyson.runtime.Intention())
+                    agentspeak.Trigger.addition,
+                    agentspeak.GoalType.achievement,
+                    agentspeak.Literal("tick"),
+                    agentspeak.runtime.Intention())
 
                 env.run_agent(developer)
             else:
